@@ -177,7 +177,6 @@ static NSString *_ConvertToCamelCaseFromSnakeCase(NSString *key) {
             }
         }
     }
-    NSLog(@"done");
 }
 
 @end
