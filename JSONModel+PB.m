@@ -21,7 +21,7 @@ static NSString *_ConvertToCamelCaseFromSnakeCase(NSString *key) {
     return str;
 }
 
-@implementation JSONModel(PB)
+@implementation JSONModel (PB)
 
 - (instancetype)initWithGPBMessage:(GPBMessage *)pbMessage {
     self = [self init];
@@ -90,7 +90,7 @@ static NSString *_ConvertToCamelCaseFromSnakeCase(NSString *key) {
                 [scanner scanUpToCharactersFromSet:[NSCharacterSet characterSetWithCharactersInString:@","]
                                         intoString:&propertyType];
                 
-                
+                // TODO
             }
             
             if (![propertyIndex objectForKey:p.name]) {
@@ -113,20 +113,24 @@ static NSString *_ConvertToCamelCaseFromSnakeCase(NSString *key) {
         // read value from pbmessage
         id value = nil;
         @try {
-            NSString *pbPropertyName = _ConvertToCamelCaseFromSnakeCase(propertyName);
-            if ([p.type isSubclassOfClass:[NSArray class]]) {
-                // for repeated properties
-                pbPropertyName = [NSString stringWithFormat:@"%@Array", pbPropertyName];
+            NSString *pbPropertyName = nil;
+            if ([self respondsToSelector:@selector(pbKeyMapper)] && [[self pbKeyMapper] objectForKey:propertyName]) {
+                // key mapping
+                pbPropertyName = [[self pbKeyMapper] objectForKey:propertyName];
+            } else {
+                // default key mapping
+                pbPropertyName = _ConvertToCamelCaseFromSnakeCase(propertyName);
+                if ([p.type isSubclassOfClass:[NSArray class]]) {
+                    // for repeated properties
+                    pbPropertyName = [NSString stringWithFormat:@"%@Array", pbPropertyName];
+                }
             }
             value = [pbMessage valueForKey:pbPropertyName];
-            // TODO: support key mapper
         } @catch (NSException *exception) {
             continue; // to next property
         }
         if (value == nil) {
             continue; // to next property
-        } else {
-            
         }
         
         // convert gpbmessage to jsonmodel
@@ -155,9 +159,25 @@ static NSString *_ConvertToCamelCaseFromSnakeCase(NSString *key) {
         else {
             if (!p.type || (p.type && [value isKindOfClass:p.type])) {
                 [self setValue:value forKey:propertyName];
+            } else {
+                // similar type convert
+                if ([value isKindOfClass:[NSNumber class]] && [p.type isSubclassOfClass:[NSString class]]) {
+                    NSString *strValue = [(NSNumber *)value stringValue];
+                    if (strValue) {
+                        [self setValue:strValue forKey:propertyName];
+                    }
+                } else if ([value isKindOfClass:[NSString class]] && [p.type isSubclassOfClass:[NSNumber class]]) {
+                    NSNumberFormatter *nf = [[NSNumberFormatter alloc] init];
+                    [nf setNumberStyle:NSNumberFormatterNoStyle];
+                    NSNumber *numValue = [nf numberFromString:value];
+                    if (numValue) {
+                        [self setValue:numValue forKey:propertyName];
+                    }
+                }
             }
         }
     }
+    NSLog(@"done");
 }
 
 @end
